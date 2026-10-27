@@ -47,6 +47,17 @@ export function GatewayError({ message }: { message: string }) {
   );
 }
 
+export function NoAccess({ role }: { role: string }) {
+  return (
+    <div role="alert" className="rounded-xl border border-line bg-surface p-6">
+      <p className="font-semibold text-ink">You don&apos;t have access to this page</p>
+      <p className="mt-1 text-sm text-ink-2">
+        Your role ({role}) can&apos;t view it. Ask an administrator if you need access.
+      </p>
+    </div>
+  );
+}
+
 export function EmptyState({ children }: { children: ReactNode }) {
   return <p className="py-8 text-center text-sm text-muted">{children}</p>;
 }

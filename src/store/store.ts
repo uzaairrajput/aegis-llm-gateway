@@ -63,9 +63,33 @@ CREATE TABLE IF NOT EXISTS audit_events (
   prompt_tokens INTEGER NOT NULL,
   completion_tokens INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  name TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('admin', 'analyst', 'viewer')),
+  password_hash TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  last_login_at INTEGER
+);
 CREATE INDEX IF NOT EXISTS idx_audit_tenant_ts ON audit_events (tenant_id, ts DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_events (ts DESC);
 `;
+
+export const ROLES = ["admin", "analyst", "viewer"] as const;
+export type Role = (typeof ROLES)[number];
+
+/** A dashboard user. The password hash never leaves the store. */
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+  createdAt: number;
+  lastLoginAt: number | null;
+}
+
+const USER_COLUMNS = "id, email, name, role, created_at AS createdAt, last_login_at AS lastLoginAt";
 
 /** API keys are stored only as SHA-256 hashes; the plaintext is shown once at creation. */
 export function hashKey(apiKey: string): string {
@@ -104,6 +128,37 @@ export class Store {
     return this.db
       .prepare("SELECT id, name, policy, key_prefix AS keyPrefix, created_at AS createdAt FROM tenants ORDER BY created_at")
       .all() as unknown as (Tenant & { keyPrefix: string; createdAt: number })[];
+  }
+
+  createUser(input: { email: string; name: string; role: Role; passwordHash: string }): User {
+    const user: User = { id: randomUUID(), email: input.email.trim().toLowerCase(), name: input.name, role: input.role, createdAt: Date.now(), lastLoginAt: null };
+    this.db
+      .prepare("INSERT INTO users (id, email, name, role, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(user.id, user.email, user.name, user.role, input.passwordHash, user.createdAt);
+    return user;
+  }
+
+  findUserById(id: string): User | undefined {
+    return this.db.prepare(`SELECT ${USER_COLUMNS} FROM users WHERE id = ?`).get(id) as unknown as User | undefined;
+  }
+
+  /** Includes the password hash; only for credential checks. */
+  findUserForLogin(email: string): (User & { passwordHash: string }) | undefined {
+    return this.db
+      .prepare(`SELECT ${USER_COLUMNS}, password_hash AS passwordHash FROM users WHERE email = ?`)
+      .get(email.trim().toLowerCase()) as unknown as (User & { passwordHash: string }) | undefined;
+  }
+
+  listUsers(): User[] {
+    return this.db.prepare(`SELECT ${USER_COLUMNS} FROM users ORDER BY created_at`).all() as unknown as User[];
+  }
+
+  deleteUser(email: string): boolean {
+    return this.db.prepare("DELETE FROM users WHERE email = ?").run(email.trim().toLowerCase()).changes > 0;
+  }
+
+  recordLogin(id: string): void {
+    this.db.prepare("UPDATE users SET last_login_at = ? WHERE id = ?").run(Date.now(), id);
   }
 
   getUsage(tenantId: string, month = currentMonth()): number {

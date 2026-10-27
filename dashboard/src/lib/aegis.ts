@@ -1,5 +1,6 @@
 // Server-side client for the Aegis admin API. The admin token is read from a non-public env var,
-// so it never reaches the browser: every request is made from Server Components.
+// so it never reaches the browser: every request is made from Server Components or Server Actions.
+import "server-only";
 
 const BASE_URL = (process.env.AEGIS_URL ?? "http://localhost:8080").replace(/\/+$/, "");
 
@@ -71,22 +72,42 @@ export interface Tenant {
   requestsPerMinute: number | null;
 }
 
-export type Result<T> = { ok: true; data: T } | { ok: false; error: string };
+export type Role = "admin" | "analyst" | "viewer";
 
-async function get<T>(path: string): Promise<Result<T>> {
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+}
+
+export type Result<T> = { ok: true; data: T } | { ok: false; status: number; error: string };
+
+async function request<T>(path: string, init?: { method: "POST"; body: unknown }): Promise<Result<T>> {
   const token = process.env.AEGIS_ADMIN_TOKEN;
-  if (!token) return { ok: false, error: "AEGIS_ADMIN_TOKEN is not set for the dashboard." };
+  if (!token) return { ok: false, status: 0, error: "AEGIS_ADMIN_TOKEN is not set for the dashboard." };
   try {
-    const res = await fetch(`${BASE_URL}${path}`, { headers: { authorization: `Bearer ${token}` } });
+    const res = await fetch(`${BASE_URL}${path}`, {
+      method: init?.method ?? "GET",
+      headers: { authorization: `Bearer ${token}`, ...(init ? { "content-type": "application/json" } : {}) },
+      body: init ? JSON.stringify(init.body) : undefined,
+    });
     if (!res.ok) {
       const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
-      return { ok: false, error: `Gateway returned ${res.status}: ${body?.error?.message ?? res.statusText}` };
+      return { ok: false, status: res.status, error: body?.error?.message ?? res.statusText };
     }
     return { ok: true, data: (await res.json()) as T };
   } catch {
-    return { ok: false, error: `Could not reach the Aegis gateway at ${BASE_URL}.` };
+    return { ok: false, status: 0, error: `Could not reach the Aegis gateway at ${BASE_URL}.` };
   }
 }
+
+const get = <T>(path: string) => request<T>(path);
+
+export const verifyCredentials = (email: string, password: string, clientIp?: string) =>
+  request<{ user: User }>("/admin/auth/login", { method: "POST", body: { email, password, clientIp } });
+
+export const getUser = (id: string) => get<{ user: User }>(`/admin/users/${encodeURIComponent(id)}`);
 
 export const getStats = (hours: number) => get<Stats>(`/admin/stats?hours=${hours}`);
 export const getTimeseries = (hours: number) => get<Timeseries>(`/admin/timeseries?hours=${hours}`);
@@ -97,15 +118,4 @@ export function getEvents(opts: { limit: number; decision?: Decision; tenant?: s
   if (opts.decision) q.set("decision", opts.decision);
   if (opts.tenant) q.set("tenant", opts.tenant);
   return get<{ events: AuditEvent[] }>(`/admin/events?${q}`);
-}
-
-export const WINDOWS = [
-  { hours: 24, label: "24 hours" },
-  { hours: 168, label: "7 days" },
-  { hours: 720, label: "30 days" },
-] as const;
-
-export function parseWindow(value: string | string[] | undefined): number {
-  const hours = Number(Array.isArray(value) ? value[0] : value);
-  return WINDOWS.some((w) => w.hours === hours) ? hours : 168;
 }

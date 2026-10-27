@@ -14,6 +14,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "mock": "tsx mock/upstream.ts",
     "tenant": "tsx src/cli/tenant.ts",
+    "user": "tsx src/cli/user.ts",
     "seed": "tsx src/cli/seed.ts",
     "traffic": "tsx src/cli/traffic.ts",
     "eval": "tsx eval/run.ts",

@@ -1,7 +1,8 @@
 import { Suspense } from "react";
 import { Meter } from "@/components/bars";
-import { Card, EmptyState, GatewayError, Skeleton } from "@/components/ui";
+import { Card, EmptyState, GatewayError, NoAccess, Skeleton } from "@/components/ui";
 import { getStats, getTenants } from "@/lib/aegis";
+import { authorize, ROLE_LABELS } from "@/lib/auth";
 import { formatCount, formatPercent } from "@/lib/format";
 
 export default function TenantsPage() {
@@ -19,6 +20,10 @@ export default function TenantsPage() {
 }
 
 async function Tenants() {
+  const access = await authorize("/tenants");
+  if (access.kind === "error") return <GatewayError message={access.message} />;
+  if (access.kind === "forbidden") return <NoAccess role={ROLE_LABELS[access.user.role]} />;
+
   const [tenants, stats] = await Promise.all([getTenants(), getStats(168)]);
   if (!tenants.ok) return <GatewayError message={tenants.error} />;
   const weekly = new Map(stats.ok ? stats.data.byTenant.map((t) => [t.tenant, t]) : []);

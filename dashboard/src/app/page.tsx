@@ -2,8 +2,10 @@ import { Suspense } from "react";
 import { BarList } from "@/components/bars";
 import { WindowPicker } from "@/components/nav";
 import { TrafficChart } from "@/components/traffic-chart";
-import { Card, EmptyState, GatewayError, Skeleton, StatTile } from "@/components/ui";
-import { getStats, getTimeseries, parseWindow, WINDOWS, type Stats } from "@/lib/aegis";
+import { Card, EmptyState, GatewayError, NoAccess, Skeleton, StatTile } from "@/components/ui";
+import { getStats, getTimeseries, type Stats } from "@/lib/aegis";
+import { authorize, ROLE_LABELS } from "@/lib/auth";
+import { parseWindow, WINDOWS } from "@/lib/windows";
 import { formatCount, formatMs, formatPercent, reasonLabel, THREAT_REASONS } from "@/lib/format";
 
 export default function OverviewPage({ searchParams }: PageProps<"/">) {
@@ -15,6 +17,10 @@ export default function OverviewPage({ searchParams }: PageProps<"/">) {
 }
 
 async function Overview({ searchParams }: Pick<PageProps<"/">, "searchParams">) {
+  const access = await authorize("/");
+  if (access.kind === "error") return <GatewayError message={access.message} />;
+  if (access.kind === "forbidden") return <NoAccess role={ROLE_LABELS[access.user.role]} />;
+
   const hours = parseWindow((await searchParams).hours);
   const windowLabel = WINDOWS.find((w) => w.hours === hours)!.label;
   const [stats, series] = await Promise.all([getStats(hours), getTimeseries(hours)]);

@@ -2,19 +2,14 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { WINDOWS } from "@/lib/aegis";
+import { WINDOWS } from "@/lib/windows";
 
-const LINKS = [
-  { href: "/", label: "Overview" },
-  { href: "/events", label: "Audit log" },
-  { href: "/tenants", label: "Tenants" },
-];
-
-export function NavLinks() {
+/** Links are filtered by role on the server; this only renders them and marks the active one. */
+export function NavLinks({ links }: { links: { href: string; label: string }[] }) {
   const pathname = usePathname();
   return (
     <nav className="flex gap-1" aria-label="Main">
-      {LINKS.map((link) => {
+      {links.map((link) => {
         const active = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
         return (
           <Link

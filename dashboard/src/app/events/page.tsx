@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { DecisionBadge, DecisionIcon } from "@/components/decision";
-import { Card, EmptyState, GatewayError, Skeleton } from "@/components/ui";
+import { Card, EmptyState, GatewayError, NoAccess, Skeleton } from "@/components/ui";
 import { getEvents, getTenants, type Decision } from "@/lib/aegis";
+import { authorize, ROLE_LABELS } from "@/lib/auth";
 import { formatDateTime, formatMs, reasonLabel } from "@/lib/format";
 
 const FILTERS: { value: Decision | undefined; label: string }[] = [
@@ -27,6 +28,10 @@ export default function EventsPage({ searchParams }: PageProps<"/events">) {
 }
 
 async function Events({ searchParams }: Pick<PageProps<"/events">, "searchParams">) {
+  const access = await authorize("/events");
+  if (access.kind === "error") return <GatewayError message={access.message} />;
+  if (access.kind === "forbidden") return <NoAccess role={ROLE_LABELS[access.user.role]} />;
+
   const params = await searchParams;
   const decision = FILTERS.find((f) => f.value === params.decision)?.value;
   const [events, tenants] = await Promise.all([getEvents({ limit: 100, decision }), getTenants()]);

@@ -19,6 +19,9 @@ services:
     environment:
       AEGIS_URL: http://gateway:8080
       AEGIS_ADMIN_TOKEN: ${ADMIN_TOKEN:-change-me}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET (32+ random characters)}
+      # Plain HTTP on localhost; set to true (the default) behind HTTPS.
+      COOKIE_SECURE: "false"
     depends_on:
       - gateway
 

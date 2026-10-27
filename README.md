@@ -36,7 +36,21 @@ Plus: per-tenant **policy-as-code** (YAML), a **monitor/shadow mode** for safe r
 
 *Screenshots show a simulated week of demo traffic (`npm run seed`). Run `npm run traffic` against a real provider to fill the dashboard with real requests.*
 
-Built with Next.js 16 (App Router, Cache Components). Pages prerender a static shell and stream live data from the gateway's admin API. The admin token stays on the server; it is never sent to the browser. Charts are hand-built SVG with a color-vision-deficiency-validated palette, icon + label legends, hover tooltips, a table view and light/dark themes.
+Built with Next.js 16 (App Router, Cache Components). Pages prerender a static shell and stream live data from the gateway's admin API. The admin token stays on the server; it is never sent to the browser.
+
+### Sign-in and roles
+
+| Role | Overview | Audit log | Tenants |
+|---|---|---|---|
+| `admin` | ✓ | ✓ | ✓ |
+| `analyst` | ✓ | ✓ | – |
+| `viewer` | ✓ | – | – |
+
+- **Accounts** are created by an operator (`npm run user -- create <email> <role>`). The password is generated, shown once, and stored as a **scrypt** hash with parameters versioned in the hash.
+- **Sessions** are HS256-signed, `HttpOnly`, `SameSite=Lax`, `Secure` cookies with an 8-hour lifetime. The cookie carries only the user id.
+- **Authorization runs on the server for every page, before any data is fetched** (a Data Access Layer). The Next.js proxy only redirects requests without a valid cookie; it isn't the security boundary. Menu links are filtered by role, and pages also refuse direct URL access.
+- **Revocation is immediate.** The user is re-read from the gateway on each request, so deleting a user or changing a role applies on their next page load, not when the cookie expires.
+- **Sign-in hardening:** the same error and the same response time for an unknown email and a wrong password (no account enumeration); 5 attempts/min per email and 20/min per IP; post-login redirects accept only same-site paths (no open redirects). Charts are hand-built SVG with a color-vision-deficiency-validated palette, icon + label legends, hover tooltips, a table view and light/dark themes.
 
 ## Architecture
 
@@ -89,11 +103,13 @@ npm run dev                        # terminal 2: gateway on :8080
 npm run tenant -- create acme      # prints an API key once
 npm run seed                       # optional: a week of realistic demo traffic
 
-cd dashboard && npm install && cp .env.example .env.local
+npm run user -- create you@example.com admin   # dashboard login; prints the password once
+
+cd dashboard && npm install && cp .env.example .env.local   # set AEGIS_ADMIN_TOKEN and SESSION_SECRET
 npm run dev                        # terminal 3: dashboard on :3000
 ```
 
-Or with Docker: `docker compose up --build` (gateway, dashboard and mock LLM).
+Or with Docker: `SESSION_SECRET=<32+ random chars> docker compose up --build` (gateway, dashboard and mock LLM).
 
 ### Real traffic
 
@@ -163,6 +179,8 @@ limits:
 | `GET /admin/timeseries?hours=24` | admin token | Requests per decision, bucketed (hourly / 6-hourly / daily) |
 | `GET /admin/events?decision=blocked` | admin token | Audit log |
 | `GET /admin/tenants` | admin token | Tenants and current-month token usage |
+| `POST /admin/auth/login` | admin token | Dashboard credential check (rate-limited); called only by the dashboard server |
+| `GET /admin/users/:id` | admin token | Current role of a dashboard user (per-request revalidation) |
 | `GET /healthz` | none | Liveness |
 
 Blocked requests return an OpenAI-shaped error (`403`, `type: "aegis_policy_violation"`), so existing SDKs raise it naturally.
@@ -182,7 +200,7 @@ Blocked requests return an OpenAI-shaped error (`403`, `type: "aegis_policy_viol
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| [`ci.yml`](.github/workflows/ci.yml) | every push and pull request | Gateway: type check, 42 tests, red-team eval. **The build fails if recall drops below 75% or the false-positive rate exceeds 5%.** Dashboard: lint, type check, production build. Both Docker images are built. |
+| [`ci.yml`](.github/workflows/ci.yml) | every push and pull request | Gateway: type check, 50 tests, red-team eval. **The build fails if recall drops below 75% or the false-positive rate exceeds 5%.** Dashboard: lint, type check, production build. Both Docker images are built. |
 | [`cd.yml`](.github/workflows/cd.yml) | CI passes on `main` | Publishes `aegis-gateway` and `aegis-dashboard` images to GitHub Container Registry, tagged `latest` and with the commit SHA (the exact commit CI tested). Then triggers a deploy if `DEPLOY_HOOK_GATEWAY` / `DEPLOY_HOOK_DASHBOARD` secrets are set (e.g. Render or Railway deploy hooks). |
 
 The eval gate is the part worth noticing. Detection rules are code, and a "small regex tweak" can silently open a hole or start blocking real users. CI treats detection quality like any other test.
@@ -200,7 +218,7 @@ src/
 dashboard/      Next.js security dashboard (reads the admin API)
 eval/           red-team datasets + evaluation runner (CI-gated)
 mock/           offline OpenAI-compatible LLM for demos and tests
-test/           unit + end-to-end tests (42)
+test/           unit + end-to-end tests (50)
 policies/       policy-as-code examples
 .github/        CI (tests, eval gate, builds) and CD (GHCR images, deploy hook)
 ```
@@ -211,6 +229,8 @@ policies/       policy-as-code examples
 - [ ] Evaluate on public injection datasets (the runner already accepts any JSONL file via `--dataset`)
 - [x] Next.js dashboard on the admin API
 - [x] CI/CD: eval-gated CI, container images published to GHCR
+- [x] Dashboard sign-in with role-based access control
+- [ ] SSO (OIDC) and per-tenant dashboard views
 - [ ] Redis-backed rate limiter and Postgres store for multi-replica deployment
 - [ ] Anthropic Messages API (`/v1/messages`) passthrough
 - [ ] Output scanning for PII the model reveals from its own context

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { NavLinks } from "@/components/nav";
+import { UserNav } from "@/components/user-nav";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -22,8 +22,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <span className="font-semibold text-ink">Aegis</span>
               <span className="hidden text-sm text-muted sm:inline">LLM Security Gateway</span>
             </div>
+            {/* Reads the session cookie, so it streams in behind its own boundary. */}
             <Suspense>
-              <NavLinks />
+              <UserNav />
             </Suspense>
           </div>
         </header>
