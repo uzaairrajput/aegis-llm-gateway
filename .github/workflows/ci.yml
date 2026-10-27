@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gateway:
+    name: Gateway — test & red-team eval
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - name: Red-team evaluation
+        run: npm run eval
+      - name: Fail on detection regression
+        # Gates merges on the eval: a rule change that drops recall or raises false positives fails CI.
+        run: |
+          node -e "
+            const r = require('./eval/results/report.json');
+            const fails = [];
+            if (r.recall < 0.75) fails.push('recall ' + r.recall);
+            if (r.fpr > 0.05) fails.push('false-positive rate ' + r.fpr);
+            if (fails.length) { console.error('Eval regression: ' + fails.join(', ')); process.exit(1); }
+            console.log('Eval OK: recall', r.recall, 'fpr', r.fpr);
+          "
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: eval/results/
+
+  dashboard:
+    name: Dashboard — lint, typecheck & build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run build
+
+  docker:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build gateway image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          cache-from: type=gha,scope=gateway
+          cache-to: type=gha,mode=max,scope=gateway
+      - name: Build dashboard image
+        uses: docker/build-push-action@v6
+        with:
+          context: dashboard
+          push: false
+          cache-from: type=gha,scope=dashboard
+          cache-to: type=gha,mode=max,scope=dashboard

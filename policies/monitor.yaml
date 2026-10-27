@@ -1,0 +1,4 @@
+# Shadow mode: nothing is blocked, every would-be block is logged as "flagged".
+# Use this to roll Aegis out in front of an existing app and measure false positives first.
+name: monitor
+mode: monitor

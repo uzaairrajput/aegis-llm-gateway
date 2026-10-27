@@ -1,0 +1,25 @@
+name: default
+mode: enforce
+
+injection:
+  enabled: true
+  threshold: 0.5
+  indirect_threshold: 0.35
+
+pii:
+  enabled: true
+  entities: [EMAIL, PHONE, CREDIT_CARD, SSN, IP_ADDRESS, SECRET]
+  rehydrate: true
+
+canary:
+  enabled: true
+
+topics:
+  blocked: []
+
+models:
+  allowed: ["*"]
+
+limits:
+  requests_per_minute: 60
+  monthly_token_budget: 1000000

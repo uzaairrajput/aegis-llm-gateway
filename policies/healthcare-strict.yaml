@@ -1,0 +1,24 @@
+# Example of a stricter tenant policy: lower thresholds, a model allowlist,
+# blocked topics, and secrets/PII never returned to the client.
+name: healthcare-strict
+mode: enforce
+
+injection:
+  threshold: 0.4
+  indirect_threshold: 0.3
+
+pii:
+  entities: [EMAIL, PHONE, CREDIT_CARD, SSN, IP_ADDRESS, SECRET]
+  rehydrate: false
+
+topics:
+  blocked:
+    - medication dosage override
+    - prescribe controlled substances
+
+models:
+  allowed: ["gpt-4o-mini", "claude-*"]
+
+limits:
+  requests_per_minute: 20
+  monthly_token_budget: 250000

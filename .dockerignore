@@ -1,0 +1,7 @@
+node_modules
+dist
+data
+dashboard
+eval/results
+.env
+.github

@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens. Chart colors are the reference palette's first three categorical slots,
+ * validated (all pairs, light and dark) for color-vision deficiency:
+ *   allowed = blue (slot 1), blocked = orange (slot 2), flagged = aqua (slot 3).
+ * Dark values are separate steps chosen for the dark surface, not an automatic flip.
+ */
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.1);
+  --hover: rgba(11, 11, 11, 0.04);
+
+  --allowed: #2a78d6;
+  --blocked: #eb6834;
+  --flagged: #1baf7a;
+  --meter-track: #cde2fb;
+
+  --warning: #fab219;
+  --critical: #d03b3b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #f0efec;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.1);
+    --hover: rgba(255, 255, 255, 0.05);
+
+    --allowed: #3987e5;
+    --blocked: #d95926;
+    --flagged: #199e70;
+    --meter-track: #104281;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --ink: #f0efec;
+  --ink-2: #c3c2b7;
+  --muted: #898781;
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --border: rgba(255, 255, 255, 0.1);
+  --hover: rgba(255, 255, 255, 0.05);
+
+  --allowed: #3987e5;
+  --blocked: #d95926;
+  --flagged: #199e70;
+  --meter-track: #104281;
+}
+
+@theme inline {
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-grid: var(--grid);
+  --color-axis: var(--axis);
+  --color-line: var(--border);
+  --color-hover: var(--hover);
+  --color-allowed: var(--allowed);
+  --color-blocked: var(--blocked);
+  --color-flagged: var(--flagged);
+  --color-meter-track: var(--meter-track);
+  --color-warning: var(--warning);
+  --color-critical: var(--critical);
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+}
+
+body {
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}

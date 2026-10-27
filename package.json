@@ -1,0 +1,35 @@
+{
+  "name": "aegis-llm-gateway",
+  "version": "0.1.0",
+  "description": "Drop-in security gateway for LLM APIs: prompt-injection detection, PII redaction, system-prompt leak detection, rate limits and token budgets.",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/src/index.js",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "mock": "tsx mock/upstream.ts",
+    "tenant": "tsx src/cli/tenant.ts",
+    "seed": "tsx src/cli/seed.ts",
+    "traffic": "tsx src/cli/traffic.ts",
+    "eval": "tsx eval/run.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "fastify": "^5.12.7",
+    "yaml": "^2.9.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  }
+}

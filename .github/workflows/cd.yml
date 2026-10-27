@@ -1,0 +1,74 @@
+name: CD
+
+# Runs only after CI succeeds on main: publishes versioned images to GitHub Container Registry,
+# then (optionally) triggers a deploy on your host.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - image: gateway
+            context: .
+          - image: dashboard
+            context: dashboard
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Publish exactly the commit CI tested.
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/aegis-${{ matrix.image }}
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short,prefix=,value=${{ github.event.workflow_run.head_sha }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  deploy:
+    needs: publish
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Trigger deploy
+        # Set DEPLOY_HOOK_GATEWAY / DEPLOY_HOOK_DASHBOARD as repository secrets (e.g. Render or Railway deploy hooks)
+        # to redeploy automatically. Without them this step is skipped and images are only published.
+        env:
+          DEPLOY_HOOK_GATEWAY: ${{ secrets.DEPLOY_HOOK_GATEWAY }}
+          DEPLOY_HOOK_DASHBOARD: ${{ secrets.DEPLOY_HOOK_DASHBOARD }}
+        run: |
+          if [ -z "$DEPLOY_HOOK_GATEWAY$DEPLOY_HOOK_DASHBOARD" ]; then
+            echo "No deploy hooks configured; images published to GHCR only."
+            exit 0
+          fi
+          for hook in "$DEPLOY_HOOK_GATEWAY" "$DEPLOY_HOOK_DASHBOARD"; do
+            if [ -n "$hook" ]; then
+              curl -fsS -X POST "$hook" > /dev/null
+              echo "Deploy triggered."
+            fi
+          done
